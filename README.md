@@ -18,4 +18,5 @@ python pacman.py # to play
 python pacman.py -p RandomAgent # to play with random agent
 python pacman.py -p NeuralAgent # to play with neural agent
 python net.py # to train the neural agent
+python pacman.py --frameTime 0.3 # to play in a slow mode 
 ```
