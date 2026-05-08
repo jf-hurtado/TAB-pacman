@@ -330,6 +330,37 @@ class NeuralAgent(Agent):
                 if ghost_distance <= 2:
                     score -= 200  # Gran penalización por estar demasiado cerca
         
+        # Factor 3: Cápsulas
+        capsules = state.getCapsules()
+        if capsules:
+            min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
+            score += 10 / (min_capsule_distance + 1)
+            
+        # Factor 4: Densidad Local de Comida
+        # Cuenta cuánta comida hay en un radio de 4 pasos y premia ir hacia grupos grandes.
+        nearby_food = sum(1 for food_pos in food if manhattanDistance(pacman_pos, food_pos) <= 4)
+        score += nearby_food * 2.0  # Cada comida cercana aporta +2.0
+        
+        # Factor 5: Radar Preventivo de Fantasmas
+        for ghost_state in ghost_states:
+            if ghost_state.scaredTimer == 0:  # Solo si son peligrosos
+                ghost_pos = ghost_state.getPosition()
+                ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+                if 2 < ghost_distance <= 5:  # Si están cerca pero no en rango letal
+                    score -= 20.0 / ghost_distance  
+        
+        # Factor 6: Prevención de Caza Suicida
+        # Si un fantasma asustado va a "despertar" antes de que lleguemos, anulamos la atracción.
+        for ghost_state in ghost_states:
+            if ghost_state.scaredTimer > 0:
+                ghost_pos = ghost_state.getPosition()
+                ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+                
+                # Si estamos más lejos que el tiempo que le queda de miedo
+                if ghost_distance > ghost_state.scaredTimer:
+                    # Anulamos el incentivo de ir tras él
+                    score -= 50 / (ghost_distance + 1)
+        
         # Combinar la puntuación de la red con la heurística
         neural_score = 0
         for i, action in enumerate(self.idx_to_action.values()):
