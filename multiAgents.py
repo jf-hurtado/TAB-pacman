@@ -361,14 +361,51 @@ class NeuralAgent(Agent):
                     # Anulamos el incentivo de ir tras él
                     score -= 50 / (ghost_distance + 1)
         
+
+        #################
+        # Sergi
+        #################
+        # Factor 7: No cazar si cerca de origen de fantasmas
+        for ghost_state in ghost_states:
+            if ghost_state.scaredTimer > 0:
+                walls = state.getWalls() #Obtenemos dimensiones del mapa
+                width, height = walls.width, walls.height
+                #Suponemos que el spawn de los fantasmas siempre está en el centro del mapa
+                map_center_distance = manhattanDistance(pacman_pos, 
+                                                     (width//2,
+                                                      height//2))
+                #Evitamos cazar cerca del spawn de fantasmas
+                score -= 50 / (map_center_distance + 1) 
+
+        
+        # Factor 8: Evitar esquinas
+        for ghost_states in ghost_states:
+            if ghost_state.scaredTimer == 0:
+                walls = state.getWalls() #Obtenemos dimensiones del mapa
+                width, height = walls.width, walls.height
+                # Coordenadas de las esquiinas del mapa
+                corners = [(width,height),(0,0),(0,height),(width,0)]
+                for corner_pos in corners:
+                    corner_distance = manhattanDistance(pacman_pos, corner_pos)
+                    if corner_distance<=5:
+                        # Intentar evitar esquinas
+                        # Reducimos poco el score para que solo evite las esquinas si no queda comida por esa zona
+                        score -= 10 / corner_distance + 1
+                   
+        
+        
+
+        
+        
         # Combinar la puntuación de la red con la heurística
         neural_score = 0
         for i, action in enumerate(self.idx_to_action.values()):
             if action in legal_actions:
                 neural_score += probabilities[i] * 100
         
-        return score + neural_score
-
+        
+        
+        return score + neural_score 
     def getAction(self, state):
         """
         Devuelve la mejor acción basada en la evaluación de la red neuronal

@@ -1,0 +1,24 @@
+Red neuronal
+
+Task1: 2 heuristicas, multiagent.py -> añadir 2 factor (añadir cosas a la formula mandada por whatsapp en una foto)
+
+Task2: aportar buenas partidas tocar valores al entrenar red neuronal
+
+AlfaBeta + Red neuronal
+
+Task3: mirar mejoras propuestas en Optional (for top grade)
+
+Task4/Task5: rellenar tabla con mapa nuevo (jugamos y entrenamos en mapa antiguo, ponemos a prueba en el nuevo)
+
+Task6: grabar partida de la red jugando bien
+
+
+
+
+
+
+Avance de Sergi hoy:
+
+Factor 7: Evitar que pacman busque comer fantasma cerca del spawn de estos
+
+Factor 8: Evitar bordes
