@@ -244,7 +244,7 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
