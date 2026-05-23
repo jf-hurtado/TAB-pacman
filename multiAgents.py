@@ -90,6 +90,85 @@ def scoreEvaluationFunction(currentGameState: GameState):
     """
     return currentGameState.getScore()
 
+
+def traditional_evaluation(state):
+    """
+    Evalúa el estado del juego usando únicamente heurísticas.
+    Retorna un score basado en la posición de los elementos.
+    """
+    # 1. Extracción de datos del estado
+    score = state.getScore()
+    pacman_pos = state.getPacmanPosition()
+    food = state.getFood().asList()
+    ghost_states = state.getGhostStates()
+    capsules = state.getCapsules()
+    
+    # Factor 1: Distancia a la comida más cercana
+    if food:
+        min_food_distance = min(manhattanDistance(pacman_pos, food_pos) for food_pos in food)
+        score += 1.0 / (min_food_distance + 1)
+    
+    # Factor 2: Proximidad a fantasmas
+    for ghost_state in ghost_states:
+        ghost_pos = ghost_state.getPosition()
+        ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+        
+        if ghost_state.scaredTimer > 0:
+            # Si el fantasma está asustado, acercarse a él
+            score += 50 / (ghost_distance + 1)
+        else:
+            # Si no está asustado, evitarlo
+            if ghost_distance <= 2:
+                score -= 200  # Gran penalización por estar demasiado cerca
+    
+    # Factor 3: Cápsulas
+    if capsules:
+        min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
+        score += 10 / (min_capsule_distance + 1)
+        
+    # Factor 4: Densidad Local de Comida
+    nearby_food = sum(1 for food_pos in food if manhattanDistance(pacman_pos, food_pos) <= 4)
+    score += nearby_food * 2.0
+    
+    # Factor 5: Radar Preventivo de Fantasmas
+    for ghost_state in ghost_states:
+        if ghost_state.scaredTimer == 0:
+            ghost_pos = ghost_state.getPosition()
+            ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+            if 2 < ghost_distance <= 5:
+                score -= 20.0 / ghost_distance  
+    
+    # Factor 6: Prevención de Caza Suicida
+    for ghost_state in ghost_states:
+        if ghost_state.scaredTimer > 0:
+            ghost_pos = ghost_state.getPosition()
+            ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+            if ghost_distance > ghost_state.scaredTimer:
+                score -= 50 / (ghost_distance + 1)
+    
+    # Factor 7: No cazar si cerca de origen de fantasmas
+    for ghost_state in ghost_states:
+        if ghost_state.scaredTimer > 0:
+            walls = state.getWalls()
+            width, height = walls.width, walls.height
+            map_center_distance = manhattanDistance(pacman_pos, (width//2, height//2))
+            score -= 50 / (map_center_distance + 1) 
+
+    # Factor 8: Evitar esquinas
+    for ghost_state in ghost_states: 
+        if ghost_state.scaredTimer == 0:
+            walls = state.getWalls() # Obtenemos dimensiones del mapa
+            width, height = walls.width, walls.height
+            corners = [(width-1, height-1), (1, 1), (1, height-1), (width-1, 1)]
+            for corner_pos in corners:
+                # Evitar comprobar si justo la esquina es un muro ciego
+                if not walls[corner_pos[0]][corner_pos[1]]:
+                    corner_distance = manhattanDistance(pacman_pos, corner_pos)
+                    if corner_distance <= 5:
+                        score -= 10.0 / (corner_distance + 1) # CORREGIDO: Faltaban paréntesis
+
+    return score
+
 class MultiAgentSearchAgent(Agent):
     """
     This class provides some common elements to all of your
@@ -244,7 +323,117 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
+        def alphabeta(agentIndex, depth, gameState, alpha, beta):
+            """if depth == 0 or node.is_terminal():
+                return node.evaluate()
+            
+            if is_maximizing_player:
+                max_eval = float('-inf')
+                for child in gameState.getLegalActions(0):
+                    eval_score = alphabeta(child, depth-1, alpha, beta, False)
+                    max_eval = max(max_eval, eval_score)
+                    alpha = max(alpha, eval_score)
+                    if beta <= alpha:  # Prune!
+                        break
+                return max_eval
+            else:
+                min_eval = float('inf')
+                for child in node.get_children():
+                    eval_score = alphabeta(child, depth-1, alpha, beta, True)
+                    min_eval = min(min_eval, eval_score)
+                    beta = min(beta, eval_score)
+                    if beta <= alpha:  # Prune!
+                        break
+                return min_eval"""
+            
+            if (gameState.isWin() or 
+                gameState.isLose() or 
+                depth == self.depth):
+                return self.evaluationFunction(gameState)
+            
+            #Max (Pacman)
+            if agentIndex == 0:
+                return maxValue(agentIndex,depth,gameState,alpha,beta)
+            
+            #Min (Fantasmas)
+            return minValue(agentIndex,depth,gameState,alpha,beta)
         
+        def maxValue(agentIndex,depth,gameState,alpha,beta):
+
+            v = float('-inf')
+            legalActions = gameState.getLegalActions(agentIndex)
+            
+            if not legalActions:
+                return self.evaluationFunction(gameState)
+            
+            for action in legalActions:
+                successor = gameState.generateSuccessor(agentIndex,action)
+                value = alphabeta(1,depth,successor,alpha,beta)
+                v = max(v,value)
+            
+                #Hacemos poda
+                if v >= beta:
+                    return v
+            
+                alpha = max(alpha, v)
+
+            return v
+        
+
+        def minValue(agentIndex,depth,gameState,alpha,beta):
+            v = float('inf')
+
+
+            legalActions = gameState.getLegalActions(agentIndex)
+
+            if not legalActions:
+                return self.evaluationFunction(gameState)
+            
+            nextAgent = agentIndex+1
+            nextDepth = depth
+
+            if nextAgent == gameState.getNumAgents():
+                nextAgent = 0
+                nextDepth = depth + 1
+
+            for action in legalActions:
+
+                successor = gameState.generateSuccessor(agentIndex,action)
+
+                value= alphabeta(nextAgent,nextDepth,successor,alpha,beta)
+                
+                v = min(v,value)
+                
+                #Hacemos poda
+                if v <= alpha:
+                    return v
+
+                beta = min(beta, v) 
+
+            return v
+
+        alpha = float('-inf')
+        beta = float('inf')
+
+        bestAction = None
+        bestScore = float('-inf')
+
+        for action in gameState.getLegalActions(0):
+            successor = gameState.generateSuccessor(0,action)
+
+            score = alphabeta(1,0,successor,alpha,beta)
+
+            if score > bestScore:
+                bestScore = score
+                bestAction = action
+
+            alpha = max(alpha,bestScore)
+
+        return bestAction        
+
+            
+            
+            
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
@@ -279,7 +468,7 @@ better = betterEvaluationFunction
 # Ahmed
 ###########################################################################
 
-class NeuralAgent(Agent):
+class NeuralAgentDummy(Agent):
     """
     Un agente de Pacman que utiliza una red neuronal para tomar decisiones
     basado en la evaluación del estado del juego.
@@ -376,7 +565,7 @@ class NeuralAgent(Agent):
         
         return numeric_map
 
-    def evaluationFunction(self, state):
+    def neural_evaluation(self, state):
         """
         Una función de evaluación basada en la red neuronal y en heurísticas adicionales.
         """
@@ -396,109 +585,104 @@ class NeuralAgent(Agent):
         
         # Obtener acciones legales
         legal_actions = state.getLegalActions()
-        
-        # Aplicar heurísticas adicionales, similar a betterEvaluationFunction
-        score = state.getScore()
-        
-        # Mejorar la evaluación con conocimiento del dominio
-        pacman_pos = state.getPacmanPosition()
-        food = state.getFood().asList()
-        ghost_states = state.getGhostStates()
-        
-        # Factor 1: Distancia a la comida más cercana
-        if food:
-            min_food_distance = min(manhattanDistance(pacman_pos, food_pos) for food_pos in food)
-            score += 1.0 / (min_food_distance + 1)
-        
-        # Factor 2: Proximidad a fantasmas
-        for ghost_state in ghost_states:
-            ghost_pos = ghost_state.getPosition()
-            ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
-            
-            if ghost_state.scaredTimer > 0:
-                # Si el fantasma está asustado, acercarse a él
-                score += 50 / (ghost_distance + 1)
-            else:
-                # Si no está asustado, evitarlo
-                if ghost_distance <= 2:
-                    score -= 200  # Gran penalización por estar demasiado cerca
-        
-        # Factor 3: Cápsulas
-        capsules = state.getCapsules()
-        if capsules:
-            min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
-            score += 10 / (min_capsule_distance + 1)
-            
-        # Factor 4: Densidad Local de Comida
-        # Cuenta cuánta comida hay en un radio de 4 pasos y premia ir hacia grupos grandes.
-        nearby_food = sum(1 for food_pos in food if manhattanDistance(pacman_pos, food_pos) <= 4)
-        score += nearby_food * 2.0  # Cada comida cercana aporta +2.0
-        
-        # Factor 5: Radar Preventivo de Fantasmas
-        for ghost_state in ghost_states:
-            if ghost_state.scaredTimer == 0:  # Solo si son peligrosos
-                ghost_pos = ghost_state.getPosition()
-                ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
-                if 2 < ghost_distance <= 5:  # Si están cerca pero no en rango letal
-                    score -= 20.0 / ghost_distance  
-        
-        # Factor 6: Prevención de Caza Suicida
-        # Si un fantasma asustado va a "despertar" antes de que lleguemos, anulamos la atracción.
-        for ghost_state in ghost_states:
-            if ghost_state.scaredTimer > 0:
-                ghost_pos = ghost_state.getPosition()
-                ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
-                
-                # Si estamos más lejos que el tiempo que le queda de miedo
-                if ghost_distance > ghost_state.scaredTimer:
-                    # Anulamos el incentivo de ir tras él
-                    score -= 50 / (ghost_distance + 1)
-        
-
-        #################
-        # Sergi
-        #################
-        # Factor 7: No cazar si cerca de origen de fantasmas
-        for ghost_state in ghost_states:
-            if ghost_state.scaredTimer > 0:
-                walls = state.getWalls() #Obtenemos dimensiones del mapa
-                width, height = walls.width, walls.height
-                #Suponemos que el spawn de los fantasmas siempre está en el centro del mapa
-                map_center_distance = manhattanDistance(pacman_pos, 
-                                                     (width//2,
-                                                      height//2))
-                #Evitamos cazar cerca del spawn de fantasmas
-                score -= 50 / (map_center_distance + 1) 
-
-        
-        # Factor 8: Evitar esquinas
-        for ghost_states in ghost_states:
-            if ghost_state.scaredTimer == 0:
-                walls = state.getWalls() #Obtenemos dimensiones del mapa
-                width, height = walls.width, walls.height
-                # Coordenadas de las esquiinas del mapa
-                corners = [(width,height),(0,0),(0,height),(width,0)]
-                for corner_pos in corners:
-                    corner_distance = manhattanDistance(pacman_pos, corner_pos)
-                    if corner_distance<=5:
-                        # Intentar evitar esquinas
-                        # Reducimos poco el score para que solo evite las esquinas si no queda comida por esa zona
-                        score -= 10 / corner_distance + 1
                    
-        
-        
-
-        
-        
         # Combinar la puntuación de la red con la heurística
         neural_score = 0
         for i, action in enumerate(self.idx_to_action.values()):
             if action in legal_actions:
                 neural_score += probabilities[i] * 100
+        return neural_score
+     
+    def getAction(self, state):
+        """
+        Devuelve la mejor acción basada en la evaluación de la red neuronal
+        y heurísticas adicionales.
+        """
+        self.move_count += 1
         
+        # Si no hay modelo, hacer un movimiento aleatorio
+        if self.model is None:
+            print("ERROR: Modelo no cargado. Haciendo movimiento aleatorio.")
+            exit()
+            legal_actions = state.getLegalActions()
+            return random.choice(legal_actions)
         
+        # Obtener acciones legales
+        legal_actions = state.getLegalActions()
         
-        return score + neural_score 
+        # Evaluación directa con la red neuronal
+        state_matrix = self.state_to_matrix(state)
+        state_tensor = torch.FloatTensor(state_matrix).unsqueeze(0).to(self.device)
+        
+        with torch.no_grad():
+            output = self.model(state_tensor)
+            probabilities = torch.nn.functional.softmax(output, dim=1).cpu().numpy()[0]
+        
+        # Mapear índices del modelo a acciones del juego
+        action_probs = []
+        for idx, prob in enumerate(probabilities):
+            action = self.idx_to_action[idx]
+            if action in legal_actions:
+                action_probs.append((action, prob))
+        
+        # Ordenar por probabilidad (mayor a menor)
+        action_probs.sort(key=lambda x: x[1], reverse=True)
+        
+        # Exploración: con una probabilidad decreciente, elegir aleatoriamente
+        exploration_rate = 0.2 * (0.99 ** self.move_count)  # Disminuye con el tiempo
+        if random.random() < exploration_rate:
+            # Excluir STOP si es posible
+            if len(legal_actions) > 1 and Directions.STOP in legal_actions:
+                legal_actions.remove(Directions.STOP)
+            return random.choice(legal_actions)
+        
+        # Evaluación alternativa: generar sucesores y evaluar cada uno
+        successors = []
+        for action in legal_actions:
+            successor = state.generateSuccessor(0, action)
+            eval_score = self.neural_evaluation(successor)
+            neural_score = 0
+            for a, p in action_probs:
+                if a == action:
+                    neural_score = p * 100
+                    break
+            # Combinar evaluación heurística con la predicción de la red
+            combined_score = eval_score + neural_score
+            
+            # Penalizar STOP a menos que sea la única opción
+            if action == Directions.STOP and len(legal_actions) > 1:
+                combined_score -= 50
+                
+            successors.append((action, combined_score))
+        
+        # Ordenar por puntuación combinada
+        successors.sort(key=lambda x: x[1], reverse=True)
+        
+        # Devolver la mejor acción
+        return successors[0][0]
+
+
+class NeuralAgent(NeuralAgentDummy):
+    """
+    Un agente de Pacman que utiliza una red neuronal para tomar decisiones
+    basado en la evaluación del estado del juego.
+    """
+    def __init__(self, model_path="models/pacman_model.pth"):
+        super().__init__(model_path)
+
+    def evaluationFunction(self, state):
+        """
+        Una función de evaluación basada en la red neuronal y en heurísticas adicionales.
+        """
+        # Obtener puntuación de la Red Neuronal
+        nn_score = self.neural_evaluation(state)
+        
+        # Obtener puntuación de Heurísticas
+        trad_score = traditional_evaluation(state)
+        
+        # Combinación de los resultados de la red y las heurísticas
+        return nn_score + trad_score
+    
     def getAction(self, state):
         """
         Devuelve la mejor acción basada en la evaluación de la red neuronal
@@ -566,6 +750,289 @@ class NeuralAgent(Agent):
         
         # Devolver la mejor acción
         return successors[0][0]
+     
+
+# class NeuralAgent(Agent):
+#     """
+#     Un agente de Pacman que utiliza una red neuronal para tomar decisiones
+#     basado en la evaluación del estado del juego.
+#     """
+#     def __init__(self, model_path="models/pacman_model.pth"):
+#         super().__init__()
+#         self.model = None
+#         self.input_size = None
+#         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#         self.load_model(model_path)
+        
+#         # Mapeo de índices a acciones
+#         self.idx_to_action = {
+#             0: Directions.STOP,
+#             1: Directions.NORTH,
+#             2: Directions.SOUTH,
+#             3: Directions.EAST,
+#             4: Directions.WEST
+#         }
+        
+#         # Para evaluar alternativas
+#         self.action_to_idx = {v: k for k, v in self.idx_to_action.items()}
+        
+#         # Contador de movimientos
+#         self.move_count = 0
+        
+#         print(f"NeuralAgent inicializado, usando dispositivo: {self.device}")
+
+#     def load_model(self, model_path):
+#         """Carga el modelo desde el archivo guardado"""
+#         try:
+#             if not os.path.exists(model_path):
+#                 print(f"ERROR: No se encontró el modelo en {model_path}")
+#                 return False
+                
+#             # Cargar el modelo
+#             checkpoint = torch.load(model_path, map_location=self.device)
+#             self.input_size = checkpoint['input_size']
+            
+#             # Crear y cargar el modelo
+#             self.model = PacmanNet(self.input_size, 128, 5).to(self.device)
+#             self.model.load_state_dict(checkpoint['model_state_dict'])
+#             self.model.eval()  # Modo evaluación
+            
+#             print(f"Modelo cargado correctamente desde {model_path}")
+#             print(f"Tamaño de entrada: {self.input_size}")
+#             return True
+#         except Exception as e:
+#             print(f"Error al cargar el modelo: {e}")
+#             return False
+
+#     def state_to_matrix(self, state):
+#         """Convierte el estado del juego en una matriz numérica normalizada"""
+#         # Obtener dimensiones del tablero
+#         walls = state.getWalls()
+#         width, height = walls.width, walls.height
+        
+#         # Crear una matriz numérica
+#         # 0: pared, 1: espacio vacío, 2: comida, 3: cápsula, 4: fantasma, 5: Pacman
+#         numeric_map = np.zeros((width, height), dtype=np.float32)
+        
+#         # Establecer espacios vacíos (todo lo que no es pared comienza como espacio vacío)
+#         for x in range(width):
+#             for y in range(height):
+#                 if not walls[x][y]:
+#                     numeric_map[x][y] = 1
+        
+#         # Agregar comida
+#         food = state.getFood()
+#         for x in range(width):
+#             for y in range(height):
+#                 if food[x][y]:
+#                     numeric_map[x][y] = 2
+        
+#         # Agregar cápsulas
+#         for x, y in state.getCapsules():
+#             numeric_map[x][y] = 3
+        
+#         # Agregar fantasmas
+#         for ghost_state in state.getGhostStates():
+#             ghost_x, ghost_y = int(ghost_state.getPosition()[0]), int(ghost_state.getPosition()[1])
+#             # Si el fantasma está asustado, marcarlo diferente
+#             if ghost_state.scaredTimer > 0:
+#                 numeric_map[ghost_x][ghost_y] = 6  # Fantasma asustado
+#             else:
+#                 numeric_map[ghost_x][ghost_y] = 4  # Fantasma normal
+        
+#         # Agregar Pacman
+#         pacman_x, pacman_y = state.getPacmanPosition()
+#         numeric_map[int(pacman_x)][int(pacman_y)] = 5
+        
+#         # Normalizar
+#         numeric_map = numeric_map / 6.0
+        
+#         return numeric_map
+
+#     def evaluationFunction(self, state):
+#         """
+#         Una función de evaluación basada en la red neuronal y en heurísticas adicionales.
+#         """
+#         if self.model is None:
+#             return 0  # Si no hay modelo, devolver 0
+        
+#         # Convertir a matriz
+#         state_matrix = self.state_to_matrix(state)
+        
+#         # Convertir a tensor
+#         state_tensor = torch.FloatTensor(state_matrix).unsqueeze(0).to(self.device)
+        
+#         # Obtener predicciones
+#         with torch.no_grad():
+#             output = self.model(state_tensor)
+#             probabilities = torch.nn.functional.softmax(output, dim=1).cpu().numpy()[0]
+        
+#         # Obtener acciones legales
+#         legal_actions = state.getLegalActions()
+        
+#         # Aplicar heurísticas adicionales, similar a betterEvaluationFunction
+#         score = state.getScore()
+        
+#         # Mejorar la evaluación con conocimiento del dominio
+#         pacman_pos = state.getPacmanPosition()
+#         food = state.getFood().asList()
+#         ghost_states = state.getGhostStates()
+        
+#         # Factor 1: Distancia a la comida más cercana
+#         if food:
+#             min_food_distance = min(manhattanDistance(pacman_pos, food_pos) for food_pos in food)
+#             score += 1.0 / (min_food_distance + 1)
+        
+#         # Factor 2: Proximidad a fantasmas
+#         for ghost_state in ghost_states:
+#             ghost_pos = ghost_state.getPosition()
+#             ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+            
+#             if ghost_state.scaredTimer > 0:
+#                 # Si el fantasma está asustado, acercarse a él
+#                 score += 50 / (ghost_distance + 1)
+#             else:
+#                 # Si no está asustado, evitarlo
+#                 if ghost_distance <= 2:
+#                     score -= 200  # Gran penalización por estar demasiado cerca
+        
+#         # Factor 3: Cápsulas
+#         capsules = state.getCapsules()
+#         if capsules:
+#             min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
+#             score += 10 / (min_capsule_distance + 1)
+            
+#         # Factor 4: Densidad Local de Comida
+#         # Cuenta cuánta comida hay en un radio de 4 pasos y premia ir hacia grupos grandes.
+#         nearby_food = sum(1 for food_pos in food if manhattanDistance(pacman_pos, food_pos) <= 4)
+#         score += nearby_food * 2.0  # Cada comida cercana aporta +2.0
+        
+#         # Factor 5: Radar Preventivo de Fantasmas
+#         for ghost_state in ghost_states:
+#             if ghost_state.scaredTimer == 0:  # Solo si son peligrosos
+#                 ghost_pos = ghost_state.getPosition()
+#                 ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+#                 if 2 < ghost_distance <= 5:  # Si están cerca pero no en rango letal
+#                     score -= 20.0 / ghost_distance  
+        
+#         # Factor 6: Prevención de Caza Suicida
+#         # Si un fantasma asustado va a "despertar" antes de que lleguemos, anulamos la atracción.
+#         for ghost_state in ghost_states:
+#             if ghost_state.scaredTimer > 0:
+#                 ghost_pos = ghost_state.getPosition()
+#                 ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+                
+#                 # Si estamos más lejos que el tiempo que le queda de miedo
+#                 if ghost_distance > ghost_state.scaredTimer:
+#                     # Anulamos el incentivo de ir tras él
+#                     score -= 50 / (ghost_distance + 1)
+        
+
+#         #################
+#         # Sergi
+#         #################
+#         # Factor 7: No cazar si cerca de origen de fantasmas
+#         for ghost_state in ghost_states:
+#             if ghost_state.scaredTimer > 0:
+#                 walls = state.getWalls() #Obtenemos dimensiones del mapa
+#                 width, height = walls.width, walls.height
+#                 #Suponemos que el spawn de los fantasmas siempre está en el centro del mapa
+#                 map_center_distance = manhattanDistance(pacman_pos, 
+#                                                      (width//2,
+#                                                       height//2))
+#                 #Evitamos cazar cerca del spawn de fantasmas
+#                 score -= 50 / (map_center_distance + 1) 
+
+        
+#         # Factor 8: Evitar esquinas
+#         for ghost_states in ghost_states:
+#             if ghost_state.scaredTimer == 0:
+#                 walls = state.getWalls() #Obtenemos dimensiones del mapa
+#                 width, height = walls.width, walls.height
+#                 # Coordenadas de las esquiinas del mapa
+#                 corners = [(width,height),(0,0),(0,height),(width,0)]
+#                 for corner_pos in corners:
+#                     corner_distance = manhattanDistance(pacman_pos, corner_pos)
+#                     if corner_distance<=5:
+#                         # Intentar evitar esquinas
+#                         # Reducimos poco el score para que solo evite las esquinas si no queda comida por esa zona
+#                         score -= 10 / corner_distance + 1
+                   
+#         # Combinar la puntuación de la red con la heurística
+#         neural_score = 0
+#         for i, action in enumerate(self.idx_to_action.values()):
+#             if action in legal_actions:
+#                 neural_score += probabilities[i] * 100
+        
+#         return score + neural_score
+     
+#     def getAction(self, state):
+#         """
+#         Devuelve la mejor acción basada en la evaluación de la red neuronal
+#         y heurísticas adicionales.
+#         """
+#         self.move_count += 1
+        
+#         # Si no hay modelo, hacer un movimiento aleatorio
+#         if self.model is None:
+#             print("ERROR: Modelo no cargado. Haciendo movimiento aleatorio.")
+#             exit()
+#             legal_actions = state.getLegalActions()
+#             return random.choice(legal_actions)
+        
+#         # Obtener acciones legales
+#         legal_actions = state.getLegalActions()
+        
+#         # Evaluación directa con la red neuronal
+#         state_matrix = self.state_to_matrix(state)
+#         state_tensor = torch.FloatTensor(state_matrix).unsqueeze(0).to(self.device)
+        
+#         with torch.no_grad():
+#             output = self.model(state_tensor)
+#             probabilities = torch.nn.functional.softmax(output, dim=1).cpu().numpy()[0]
+        
+#         # Mapear índices del modelo a acciones del juego
+#         action_probs = []
+#         for idx, prob in enumerate(probabilities):
+#             action = self.idx_to_action[idx]
+#             if action in legal_actions:
+#                 action_probs.append((action, prob))
+        
+#         # Ordenar por probabilidad (mayor a menor)
+#         action_probs.sort(key=lambda x: x[1], reverse=True)
+        
+#         # Exploración: con una probabilidad decreciente, elegir aleatoriamente
+#         exploration_rate = 0.2 * (0.99 ** self.move_count)  # Disminuye con el tiempo
+#         if random.random() < exploration_rate:
+#             # Excluir STOP si es posible
+#             if len(legal_actions) > 1 and Directions.STOP in legal_actions:
+#                 legal_actions.remove(Directions.STOP)
+#             return random.choice(legal_actions)
+        
+#         # Evaluación alternativa: generar sucesores y evaluar cada uno
+#         successors = []
+#         for action in legal_actions:
+#             successor = state.generateSuccessor(0, action)
+#             eval_score = self.evaluationFunction(successor)
+#             neural_score = 0
+#             for a, p in action_probs:
+#                 if a == action:
+#                     neural_score = p * 100
+#                     break
+#             # Combinar evaluación heurística con la predicción de la red
+#             combined_score = eval_score + neural_score
+            
+#             # Penalizar STOP a menos que sea la única opción
+#             if action == Directions.STOP and len(legal_actions) > 1:
+#                 combined_score -= 50
+                
+#             successors.append((action, combined_score))
+        
+#         # Ordenar por puntuación combinada
+#         successors.sort(key=lambda x: x[1], reverse=True)
+        
+#         # Devolver la mejor acción
+#         return successors[0][0]
 
 # Definir una función para crear el agente
 def createNeuralAgent(model_path="models/pacman_model.pth"):
