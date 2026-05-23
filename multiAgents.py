@@ -1251,8 +1251,8 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
     def __init__(self,
                  evalFn='scoreEvaluationFunction',
                  depth='2',
-                 heuristicsWeight=1,
-                 nnWeight=0):
+                 heuristicsWeight=0.01,
+                 nnWeight=0.99):
         super().__init__(evalFn, depth)
 
         self.evaluationFunction = self.evaluation_combined

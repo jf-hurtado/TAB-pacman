@@ -110,7 +110,7 @@ class PacmanNet(nn.Module):
 #     print(f"Datos cargados: {len(all_maps)} ejemplos")
 #     return all_maps, all_actions
 
-def load_and_merge_data(data_dir="pacman_data", top_ratio=0.5):
+def load_and_merge_data(data_dir="pacman_data", top_ratio=1):
     """
     Carga los archivos CSV de partidas y los combina en un único DataFrame.
     Permite filtrar las mejores partidas basándose en el parámetro top_ratio (0.0 a 1.0).
