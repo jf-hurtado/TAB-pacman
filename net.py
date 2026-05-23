@@ -80,35 +80,86 @@ class PacmanNet(nn.Module):
         
         return x
 
-def load_and_merge_data(data_dir="pacman_data"):
-    """Carga todos los archivos CSV de partidas y los combina en un único DataFrame"""
+# def load_and_merge_data(data_dir="pacman_data"):
+#     """Carga todos los archivos CSV de partidas y los combina en un único DataFrame"""
+#     all_maps = []
+#     all_actions = []
+    
+#     csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
+#     print(f"Archivos CSV encontrados: {csv_files}")
+    
+#     if not csv_files:
+#         raise ValueError(f"No se encontraron archivos CSV en {data_dir}")
+    
+#     print(f"Cargando {len(csv_files)} archivos de partidas...")
+    
+#     for csv_file in csv_files:
+#         with open(csv_file, 'r') as f:
+#             reader = csv.DictReader(f)
+#             for row in reader:
+#                 # Solo usar movimientos de Pacman (agente 0)
+#                 if int(row.get('agent_index', 0)) == 0:
+#                     action = row.get('action')
+#                     map_matrix = json.loads(row.get('map_matrix', '[]'))
+                    
+#                     # Verificar que los datos sean válidos
+#                     if action in ACTION_TO_IDX and map_matrix:
+#                         all_maps.append(map_matrix)
+#                         all_actions.append(ACTION_TO_IDX[action])
+    
+#     print(f"Datos cargados: {len(all_maps)} ejemplos")
+#     return all_maps, all_actions
+
+def load_and_merge_data(data_dir="pacman_data", top_ratio=0.5):
+    """
+    Carga los archivos CSV de partidas y los combina en un único DataFrame.
+    Permite filtrar las mejores partidas basándose en el parámetro top_ratio (0.0 a 1.0).
+    """
     all_maps = []
     all_actions = []
     
     csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
-    print(f"Archivos CSV encontrados: {csv_files}")
+    print(f"Archivos CSV encontrados: {len(csv_files)}")
     
     if not csv_files:
         raise ValueError(f"No se encontraron archivos CSV en {data_dir}")
-    
-    print(f"Cargando {len(csv_files)} archivos de partidas...")
-    
+
+    print(f"Analizando puntuaciones para seleccionar el \
+        Top {int(top_ratio*100)}% de las mejores partidas...")
+    game_rankings = []
     for csv_file in csv_files:
+        df_temp = pd.read_csv(csv_file)
+        if not df_temp.empty:
+            # Obtenemos la última puntuación registrada en la partida
+            final_score = df_temp['score'].iloc[-1]
+            game_rankings.append((csv_file, final_score))
+    
+    # Ordenamos de mayor a menor score
+    game_rankings.sort(key=lambda x: x[1], reverse=True)
+    
+    # Calculamos cuántas partidas vamos a mantener basándonos en el ratio
+    num_to_keep = max(1, int(len(game_rankings) * top_ratio))
+    best_files = [f[0] for f in game_rankings[:num_to_keep]]
+    
+    print(f"Filtrado completado: Seleccionadas {len(best_files)} partidas de {len(game_rankings)}")
+
+    print(f"Cargando {len(best_files)} archivos de partidas seleccionadas...")
+    
+    for csv_file in best_files:
         with open(csv_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Solo usar movimientos de Pacman (agente 0)
                 if int(row.get('agent_index', 0)) == 0:
                     action = row.get('action')
                     map_matrix = json.loads(row.get('map_matrix', '[]'))
                     
-                    # Verificar que los datos sean válidos
                     if action in ACTION_TO_IDX and map_matrix:
                         all_maps.append(map_matrix)
                         all_actions.append(ACTION_TO_IDX[action])
     
-    print(f"Datos cargados: {len(all_maps)} ejemplos")
+    print(f"Datos cargados: {len(all_maps)} ejemplos provenientes de las mejores partidas.")
     return all_maps, all_actions
+
 
 def preprocess_maps(maps):
     """Preprocesa las matrices del juego para preparar los datos de entrada para la red"""
