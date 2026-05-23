@@ -1248,18 +1248,29 @@ def createNeuralAgent(model_path="models/pacman_model.pth"):
 
 class AlphaBetaNeuralAgent(AlphaBetaAgent):
     
-    neural_agent_dummy = NeuralAgentDummy()
-
     def __init__(self,
                  evalFn='scoreEvaluationFunction',
                  depth='2',
-                 heuristicsWeight=0.7,
-                 nnWeight=0.3):
+                 heuristicsWeight=1,
+                 nnWeight=0):
         super().__init__(evalFn, depth)
 
+        self.evaluationFunction = self.evaluation_combined
         self.w_heuristic = heuristicsWeight
         self.w_neural = nnWeight
+        self.neural_agent_dummy = NeuralAgentDummy()
     
+    def evaluation_combined(self, state):
+        # 1) Traditional score (with the new heuristics from Task 1)
+        trad_score = traditional_evaluation(state)
+        print(f"Heuristic score: {trad_score}")
+
+        # 2) Neural network score
+        neural_score = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(state)
+        print(f"Neural network score: {neural_score}")
+
+        # 3) Weighted combination
+        return self.w_heuristic * trad_score + self.w_neural * neural_score
 
     def getAction(self, gameState: GameState):
         """
@@ -1271,12 +1282,12 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             if (gameState.isWin() or
                 gameState.isLose() or
                 depth == self.depth):
-                #return self.evaluationFunction(gameState)
-                heuristic = traditional_evaluation(gameState)
-                nnScore = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(gameState)
-                print(heuristic)
-                print(nnScore)
-                return (0.7*heuristic + 0.3*nnScore)
+                return self.evaluationFunction(gameState)
+                # heuristic = traditional_evaluation(gameState)
+                # nnScore = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(gameState)
+                # print(heuristic)
+                # print(nnScore)
+                # return (0.7*heuristic + 0.3*nnScore)
 
             #Max (Pacman)
             if agentIndex == 0:
@@ -1291,7 +1302,7 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             legalActions = gameState.getLegalActions(agentIndex)
 
             if not legalActions:
-                return traditional_evaluation(gameState)
+                return self.evaluationFunction(gameState)
 
             for action in legalActions:
                 successor = gameState.generateSuccessor(agentIndex,action)
@@ -1314,7 +1325,7 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             legalActions = gameState.getLegalActions(agentIndex)
 
             if not legalActions:
-                return traditional_evaluation(gameState)
+                return self.evaluationFunction(gameState)
 
             nextAgent = agentIndex+1
             nextDepth = depth
@@ -1357,15 +1368,5 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             alpha = max(alpha,bestScore)
 
         return bestAction
-
-    def evaluation_combined(self, state):
-        # 1) Traditional score (with the new heuristics from Task 1)
-        trad_score = traditional_evaluation(state)
-
-        # 2) Neural network score
-        neural_score = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(state)
-
-        # 3) Weighted combination
-        return self.w_heuristic * trad_score + self.w_neural * neural_score
 
 
