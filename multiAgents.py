@@ -1266,11 +1266,12 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
         print(f"Heuristic score: {trad_score}")
 
         # 2) Neural network score
-        neural_score = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(state)
+        neural_score = self.neural_agent_dummy.neural_evaluation(state)
         print(f"Neural network score: {neural_score}")
 
         # 3) Weighted combination
         return self.w_heuristic * trad_score + self.w_neural * neural_score
+
 
     def getAction(self, gameState: GameState):
         """
