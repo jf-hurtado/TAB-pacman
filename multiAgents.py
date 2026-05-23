@@ -217,37 +217,70 @@ def traditional_evaluation(state):
             # Si no está asustado, evitarlo
             if ghost_distance <= 2:
                 score -= 200  # Gran penalización por estar demasiado cerca
-
-    # Factor 3: Cápsulas
-    capsules = state.getCapsules()
+    # Factor 3: Cápsulas (defensivo y ofensivo)
     if capsules:
-        min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
-        score += 10 / (min_capsule_distance + 1)
+        min_cap_dist = min(manhattanDistance(pacman_pos, c) for c in capsules)
+        # ¿Hay fantasmas peligrosos cerca?
+        danger_close = any(
+            g.scaredTimer == 0 and manhattanDistance(pacman_pos, g.getPosition()) <= 4
+            for g in ghost_states
+        )
+        if danger_close:
+            score += 100.0 / (min_cap_dist + 1)
+        else:
+            score += 5.0 / (min_cap_dist + 1)
 
-    # Factor 4: Densidad Local de Comida
-    # Cuenta cuánta comida hay en un radio de 4 pasos y premia ir hacia grupos grandes.
-    nearby_food = sum(1 for food_pos in food if manhattanDistance(pacman_pos, food_pos) <= 4)
-    score += nearby_food * 2.0  # Cada comida cercana aporta +2.0
+    # Factor 4: Densidad local de comida
+    nearby_food = sum(1 for f in food if manhattanDistance(pacman_pos, f) <= 4)
+    score += nearby_food * 2.0
 
-    # Factor 5: Radar Preventivo de Fantasmas
-    for ghost_state in ghost_states:
-        if ghost_state.scaredTimer == 0:  # Solo si son peligrosos
-            ghost_pos = ghost_state.getPosition()
-            ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
-            if 2 < ghost_distance <= 5:  # Si están cerca pero no en rango letal
-                score -= 20.0 / ghost_distance
+    # Factor 5: Radar preventivo de fantasmas (evitar a distancia 2-5)
+    for g in ghost_states:
+        if g.scaredTimer == 0:
+            dist = manhattanDistance(pacman_pos, g.getPosition())
+            if 2 < dist <= 5:
+                score -= 20.0 / dist
 
-    # Factor 6: Prevención de Caza Suicida
-    # Si un fantasma asustado va a "despertar" antes de que lleguemos, anulamos la atracción.
-    for ghost_state in ghost_states:
-        if ghost_state.scaredTimer > 0:
-            ghost_pos = ghost_state.getPosition()
-            ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+    # Factor 6: Anti‑caza suicida
+    for g in ghost_states:
+        if g.scaredTimer > 0:
+            dist = manhattanDistance(pacman_pos, g.getPosition())
+            if dist > g.scaredTimer:
+                score -= 50.0 / (dist + 1)
 
-            # Si estamos más lejos que el tiempo que le queda de miedo
-            if ghost_distance > ghost_state.scaredTimer:
-                # Anulamos el incentivo de ir tras él
-                score -= 50 / (ghost_distance + 1)
+
+
+
+    # # Factor 3: Cápsulas
+    # capsules = state.getCapsules()
+    # if capsules:
+    #     min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
+    #     score += 10 / (min_capsule_distance + 1)
+
+    # # Factor 4: Densidad Local de Comida
+    # # Cuenta cuánta comida hay en un radio de 4 pasos y premia ir hacia grupos grandes.
+    # nearby_food = sum(1 for food_pos in food if manhattanDistance(pacman_pos, food_pos) <= 4)
+    # score += nearby_food * 2.0  # Cada comida cercana aporta +2.0
+
+    # # Factor 5: Radar Preventivo de Fantasmas
+    # for ghost_state in ghost_states:
+    #     if ghost_state.scaredTimer == 0:  # Solo si son peligrosos
+    #         ghost_pos = ghost_state.getPosition()
+    #         ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+    #         if 2 < ghost_distance <= 5:  # Si están cerca pero no en rango letal
+    #             score -= 20.0 / ghost_distance
+
+    # # Factor 6: Prevención de Caza Suicida
+    # # Si un fantasma asustado va a "despertar" antes de que lleguemos, anulamos la atracción.
+    # for ghost_state in ghost_states:
+    #     if ghost_state.scaredTimer > 0:
+    #         ghost_pos = ghost_state.getPosition()
+    #         ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+
+    #         # Si estamos más lejos que el tiempo que le queda de miedo
+    #         if ghost_distance > ghost_state.scaredTimer:
+    #             # Anulamos el incentivo de ir tras él
+    #             score -= 50 / (ghost_distance + 1)
 
     # # -----------------------------------------------------------------------
     # # Factor 1: Progresión en la comida
@@ -1234,33 +1267,12 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
         """
         "*** YOUR CODE HERE ***"
         def alphabeta(agentIndex, depth, gameState, alpha, beta):
-            """if depth == 0 or node.is_terminal():
-                return node.evaluate()
-
-            if is_maximizing_player:
-                max_eval = float('-inf')
-                for child in gameState.getLegalActions(0):
-                    eval_score = alphabeta(child, depth-1, alpha, beta, False)
-                    max_eval = max(max_eval, eval_score)
-                    alpha = max(alpha, eval_score)
-                    if beta <= alpha:  # Prune!
-                        break
-                return max_eval
-            else:
-                min_eval = float('inf')
-                for child in node.get_children():
-                    eval_score = alphabeta(child, depth-1, alpha, beta, True)
-                    min_eval = min(min_eval, eval_score)
-                    beta = min(beta, eval_score)
-                    if beta <= alpha:  # Prune!
-                        break
-                return min_eval"""
 
             if (gameState.isWin() or
                 gameState.isLose() or
                 depth == self.depth):
                 #return self.evaluationFunction(gameState)
-                heuristic = self.evaluationFunction(gameState)
+                heuristic = traditional_evaluation(gameState)
                 nnScore = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(gameState)
                 print(heuristic)
                 print(nnScore)
@@ -1279,7 +1291,7 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             legalActions = gameState.getLegalActions(agentIndex)
 
             if not legalActions:
-                return self.evaluationFunction(gameState)
+                return traditional_evaluation(gameState)
 
             for action in legalActions:
                 successor = gameState.generateSuccessor(agentIndex,action)
@@ -1302,7 +1314,7 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             legalActions = gameState.getLegalActions(agentIndex)
 
             if not legalActions:
-                return self.evaluation_combined(gameState)
+                return traditional_evaluation(gameState)
 
             nextAgent = agentIndex+1
             nextDepth = depth
