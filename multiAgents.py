@@ -92,83 +92,6 @@ def scoreEvaluationFunction(currentGameState: GameState):
     return currentGameState.getScore()
 
 
-# def traditional_evaluation(state):
-#     """
-#     Evalúa el estado del juego usando únicamente heurísticas.
-#     Retorna un score basado en la posición de los elementos.
-#     """
-#     if state.isWin(): return 999999
-#     if state.isLose(): return -999999
-
-#     score = state.getScore()
-#     pacman_pos = state.getPacmanPosition()
-#     food_grid = state.getFood()
-#     food_list = food_grid.asList()
-#     ghost_states = state.getGhostStates()
-#     capsules = state.getCapsules()
-#     legal_actions = state.getLegalActions(0)
-
-#     # --- 1. FACTOR DE PROGRESO (Anti-Estancamiento) ---
-#     # Penalizamos radicalmente que Pacman no tenga opciones de movimiento
-#     # Esto evita que se quede "encajado" en esquinas sin salida.
-#     if len(legal_actions) <= 2: # Es un pasillo o esquina
-#         score -= 10
-
-#     # --- 2. EL CENTRO DE MASA (La "Marea" de Comida) ---
-#     if food_list:
-#         # Penalización por cantidad de comida (Motor principal)
-#         score -= 100 * len(food_list)
-
-#         # Distancia a la comida más cercana (Navegación local)
-#         min_food_dist = min([manhattanDistance(pacman_pos, f) for f in food_list])
-#         score -= 2 * min_food_dist
-
-#         # Atracción al "Centro de Masa" (Navegación global)
-#         # Esto evita que se quede dando vueltas si hay comida en dos extremos
-#         avg_x = sum(f[0] for f in food_list) / len(food_list)
-#         avg_y = sum(f[1] for f in food_list) / len(food_list)
-#         dist_to_center = manhattanDistance(pacman_pos, (avg_x, avg_y))
-#         score -= 0.5 * dist_to_center
-
-#     # --- 3. DINÁMICA DE FANTASMAS (Evitación Inteligente) ---
-#     for ghost in ghost_states:
-#         dist = manhattanDistance(pacman_pos, ghost.getPosition())
-#         if ghost.scaredTimer > 0:
-#             # Incentivo para cazar (Solo si llegamos a tiempo)
-#             if ghost.scaredTimer > dist:
-#                 score += 100 / (dist + 1)
-#         else:
-#             # Miedo preventivo (Campo de repulsión)
-#             if dist < 2:
-#                 score -= 2000 # Muerte inminente
-#             elif dist < 5:
-#                 # Cuanto más cerca, más resta, pero de forma asintótica
-#                 score -= 200 / (dist + 1)
-
-#     # --- 4. GESTIÓN DE CÁPSULAS ---
-#     if capsules:
-#         score -= 250 * len(capsules)
-#         min_cap_dist = min([manhattanDistance(pacman_pos, c) for c in capsules])
-#         score -= 10 * min_cap_dist
-
-#     # --- 5. PENALIZACIÓN POR "QUEDARSE MIRANDO" ---
-#     # Si la acción que llevó a este estado fue STOP, penalizamos.
-#     # Nota: currentGameState.getPacmanState().configuration.direction nos da la última acción
-#     if state.getPacmanState().getDirection() == 'Stop':
-#         score -= 500
-
-#     raw_score = score
-
-#     # NORMALIZACIÓN SIGMOIDE (0 a 100)
-#     # k=50 es la "pendiente". Si el score es 0, devuelve 50.
-#     # Si el score es muy alto, tiende a 100. Si es muy bajo, tiende a 0.
-#     try:
-#         norm_score = 100.0 / (1.0 + math.exp(-raw_score / 50.0))
-#     except OverflowError:
-#         norm_score = 100.0 if raw_score > 0 else 0.0
-
-#     return norm_score
-
 
 # def traditional_evaluation(state):
 #     """
@@ -277,135 +200,160 @@ def traditional_evaluation(state):
     ghost_states = state.getGhostStates()
     capsules = state.getCapsules()
     legal_actions = state.getLegalActions()
-
-    # -----------------------------------------------------------------------
-    # Factor 1: Progresión en la comida
-    # -----------------------------------------------------------------------
+    # Factor 1: Distancia a la comida más cercana
     if food:
-        min_food_dist = min(manhattanDistance(pacman_pos, f) for f in food)
-        score += 2.0 / (min_food_dist + 1)
-        # Penalizar la cantidad de comida restante
-        score -= 0.5 * len(food)
+        min_food_distance = min(manhattanDistance(pacman_pos, food_pos) for food_pos in food)
+        score += 1.0 / (min_food_distance + 1)
 
-    # -----------------------------------------------------------------------
-    # Factor 2: Gestión de Fantasmas
-    # -----------------------------------------------------------------------
+    # Factor 2: Proximidad a fantasmas
     for ghost_state in ghost_states:
         ghost_pos = ghost_state.getPosition()
-        ghost_dist = manhattanDistance(pacman_pos, ghost_pos)
+        ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
 
         if ghost_state.scaredTimer > 0:
-            # --- FANTASMA ASUSTADO: Decidir si perseguir ---
-            if ghost_dist <= ghost_state.scaredTimer:
-                # Podemos alcanzarlo antes de que despierte -> PERSECUCIÓN
-                score += 200 / (ghost_dist + 1)
-                # Bonus extra si está a tiro (distancia 1) -> COMERLO da 200+ puntos
-                if ghost_dist <= 1:
-                    score += 300
-            else:
-                # Se despertará antes de que lleguemos -> penalización leve
-                score -= 30 / (ghost_dist + 1)
+            # Si el fantasma está asustado, acercarse a él
+            score += 50 / (ghost_distance + 1)
         else:
-            # --- FANTASMA PELIGROSO: Penalización incremental por distancia ---
-            if ghost_dist <= 1:
-                score -= 2000  # ¡Muerte inminente!
-            elif ghost_dist == 2:
-                score -= 500   # Muy peligroso
-            elif ghost_dist == 3:
-                score -= 150   # Peligroso
-            elif ghost_dist <= 5:
-                score -= 30.0 / ghost_dist  # Zona de precaución
+            # Si no está asustado, evitarlo
+            if ghost_distance <= 2:
+                score -= 200  # Gran penalización por estar demasiado cerca
 
-    # -----------------------------------------------------------------------
-    # Factor 3: Cápsulas (con valor defensivo y ofensivo)
-    # -----------------------------------------------------------------------
+    # Factor 3: Cápsulas
+    capsules = state.getCapsules()
     if capsules:
-        min_cap_dist = min(manhattanDistance(pacman_pos, c) for c in capsules)
+        min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
+        score += 10 / (min_capsule_distance + 1)
 
-        # (A) Valor DEFENSIVO: ¿hay fantasmas peligrosos cerca (dist <= 4)?
-        # Si sí, la cápsula es una ruta de escape -> altísima prioridad
-        hay_fantasma_peligroso_cerca = any(
-            ghost_state.scaredTimer == 0 and
-            manhattanDistance(pacman_pos, ghost_state.getPosition()) <= 4
-            for ghost_state in ghost_states
-        )
-
-        # (B) Valor OFENSIVO: ¿hay fantasmas asustados ALCANZABLES?
-        # Un fantasma es alcanzable si está a una distancia que podamos recorrer
-        # antes de que se le acabe el temporizador de miedo
-        hay_fantasma_para_cazar = any(
-            ghost_state.scaredTimer > 0 and 
-            manhattanDistance(pacman_pos, ghost_state.getPosition()) <= ghost_state.scaredTimer
-            for ghost_state in ghost_states
-        )
-
-        if hay_fantasma_peligroso_cerca:
-            # ESCAPE: comerse la cápsula ahuyenta a los fantasmas cercanos
-            score += 100 / (min_cap_dist + 1)
-        elif hay_fantasma_para_cazar:
-            # ATAQUE: podemos comernos los fantasmas asustados
-            score += 40 / (min_cap_dist + 1)
-        else:
-            # Valor base: solo por puntos
-            score += 5 / (min_cap_dist + 1)
-
-    # -----------------------------------------------------------------------
     # Factor 4: Densidad Local de Comida
-    # -----------------------------------------------------------------------
-    nearby_food = sum(1 for f in food if manhattanDistance(pacman_pos, f) <= 5)
-    score += nearby_food * 3.0
+    # Cuenta cuánta comida hay en un radio de 4 pasos y premia ir hacia grupos grandes.
+    nearby_food = sum(1 for food_pos in food if manhattanDistance(pacman_pos, food_pos) <= 4)
+    score += nearby_food * 2.0  # Cada comida cercana aporta +2.0
 
-    # -----------------------------------------------------------------------
-    # Factor 5: Anti-estancamiento en esquinas
-    # -----------------------------------------------------------------------
-    if len(legal_actions) <= 2:
-        # Penalización por estar en pasillo sin salida o esquina.
-        # Si hay comida muy cerca, reducimos la penalización para no 
-        # desincentivar entrar por ella.
-        food_nearby_in_dead_end = sum(1 for f in food if manhattanDistance(pacman_pos, f) <= 3)
-        corner_penalty = 100 - food_nearby_in_dead_end * 20
-        score -= max(corner_penalty, 20) # Mínimo -20 aunque haya comida
+    # Factor 5: Radar Preventivo de Fantasmas
+    for ghost_state in ghost_states:
+        if ghost_state.scaredTimer == 0:  # Solo si son peligrosos
+            ghost_pos = ghost_state.getPosition()
+            ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+            if 2 < ghost_distance <= 5:  # Si están cerca pero no en rango letal
+                score -= 20.0 / ghost_distance
 
-    # -----------------------------------------------------------------------
-    # Factor 6: Evitar zona de spawn de fantasmas
-    # -----------------------------------------------------------------------
-    walls = state.getWalls()
-    width, height = walls.width, walls.height
-    center = (width // 2, height // 2)
-    dist_to_center = manhattanDistance(pacman_pos, center)
+    # Factor 6: Prevención de Caza Suicida
+    # Si un fantasma asustado va a "despertar" antes de que lleguemos, anulamos la atracción.
+    for ghost_state in ghost_states:
+        if ghost_state.scaredTimer > 0:
+            ghost_pos = ghost_state.getPosition()
+            ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
 
-    if dist_to_center <= 4:
-        for ghost_state in ghost_states:
-            if ghost_state.scaredTimer == 0:
-                ghost_pos = ghost_state.getPosition()
-                ghost_dist = manhattanDistance(pacman_pos, ghost_pos)
-                if ghost_dist <= 8:
-                    score -= 100 / (ghost_dist + 1)
+            # Si estamos más lejos que el tiempo que le queda de miedo
+            if ghost_distance > ghost_state.scaredTimer:
+                # Anulamos el incentivo de ir tras él
+                score -= 50 / (ghost_distance + 1)
+
+    # # -----------------------------------------------------------------------
+    # # Factor 1: Progresión en la comida
+    # # -----------------------------------------------------------------------
+    # if food:
+    #     min_food_dist = min(manhattanDistance(pacman_pos, f) for f in food)
+    #     score += 2.0 / (min_food_dist + 1)
+    #     # Penalizar la cantidad de comida restante
+    #     score -= 0.5 * len(food)
+
+    # # -----------------------------------------------------------------------
+    # # Factor 2: Gestión de Fantasmas
+    # # -----------------------------------------------------------------------
+    # for ghost_state in ghost_states:
+    #     ghost_pos = ghost_state.getPosition()
+    #     ghost_dist = manhattanDistance(pacman_pos, ghost_pos)
+
+    #     if ghost_state.scaredTimer > 0:
+    #         # --- FANTASMA ASUSTADO: Decidir si perseguir ---
+    #         if ghost_dist <= ghost_state.scaredTimer:
+    #             # Podemos alcanzarlo antes de que despierte -> PERSECUCIÓN
+    #             score += 200 / (ghost_dist + 1)
+    #             # Bonus extra si está a tiro (distancia 1) -> COMERLO da 200+ puntos
+    #             if ghost_dist <= 1:
+    #                 score += 300
+    #         else:
+    #             # Se despertará antes de que lleguemos -> penalización leve
+    #             score -= 30 / (ghost_dist + 1)
+    #     else:
+    #         # --- FANTASMA PELIGROSO: Penalización incremental por distancia ---
+    #         if ghost_dist <= 1:
+    #             score -= 2000  # ¡Muerte inminente!
+    #         elif ghost_dist == 2:
+    #             score -= 500   # Muy peligroso
+    #         elif ghost_dist == 3:
+    #             score -= 150   # Peligroso
+    #         elif ghost_dist <= 5:
+    #             score -= 30.0 / ghost_dist  # Zona de precaución
+
+    # # -----------------------------------------------------------------------
+    # # Factor 3: Cápsulas (con valor defensivo y ofensivo)
+    # # -----------------------------------------------------------------------
+    # if capsules:
+    #     min_cap_dist = min(manhattanDistance(pacman_pos, c) for c in capsules)
+
+    #     # (A) Valor DEFENSIVO: ¿hay fantasmas peligrosos cerca (dist <= 4)?
+    #     # Si sí, la cápsula es una ruta de escape -> altísima prioridad
+    #     hay_fantasma_peligroso_cerca = any(
+    #         ghost_state.scaredTimer == 0 and
+    #         manhattanDistance(pacman_pos, ghost_state.getPosition()) <= 4
+    #         for ghost_state in ghost_states
+    #     )
+
+    #     # (B) Valor OFENSIVO: ¿hay fantasmas asustados ALCANZABLES?
+    #     # Un fantasma es alcanzable si está a una distancia que podamos recorrer
+    #     # antes de que se le acabe el temporizador de miedo
+    #     hay_fantasma_para_cazar = any(
+    #         ghost_state.scaredTimer > 0 and 
+    #         manhattanDistance(pacman_pos, ghost_state.getPosition()) <= ghost_state.scaredTimer
+    #         for ghost_state in ghost_states
+    #     )
+
+    #     if hay_fantasma_peligroso_cerca:
+    #         # ESCAPE: comerse la cápsula ahuyenta a los fantasmas cercanos
+    #         score += 100 / (min_cap_dist + 1)
+    #     elif hay_fantasma_para_cazar:
+    #         # ATAQUE: podemos comernos los fantasmas asustados
+    #         score += 40 / (min_cap_dist + 1)
+    #     else:
+    #         # Valor base: solo por puntos
+    #         score += 5 / (min_cap_dist + 1)
+
+    # # -----------------------------------------------------------------------
+    # # Factor 4: Densidad Local de Comida
+    # # -----------------------------------------------------------------------
+    # nearby_food = sum(1 for f in food if manhattanDistance(pacman_pos, f) <= 5)
+    # score += nearby_food * 3.0
+
+    # # -----------------------------------------------------------------------
+    # # Factor 5: Anti-estancamiento en esquinas
+    # # -----------------------------------------------------------------------
+    # if len(legal_actions) <= 2:
+    #     # Penalización por estar en pasillo sin salida o esquina.
+    #     # Si hay comida muy cerca, reducimos la penalización para no 
+    #     # desincentivar entrar por ella.
+    #     food_nearby_in_dead_end = sum(1 for f in food if manhattanDistance(pacman_pos, f) <= 3)
+    #     corner_penalty = 100 - food_nearby_in_dead_end * 20
+    #     score -= max(corner_penalty, 20) # Mínimo -20 aunque haya comida
+
+    # # -----------------------------------------------------------------------
+    # # Factor 6: Evitar zona de spawn de fantasmas
+    # # -----------------------------------------------------------------------
+    # walls = state.getWalls()
+    # width, height = walls.width, walls.height
+    # center = (width // 2, height // 2)
+    # dist_to_center = manhattanDistance(pacman_pos, center)
+
+    # if dist_to_center <= 4:
+    #     for ghost_state in ghost_states:
+    #         if ghost_state.scaredTimer == 0:
+    #             ghost_pos = ghost_state.getPosition()
+    #             ghost_dist = manhattanDistance(pacman_pos, ghost_pos)
+    #             if ghost_dist <= 8:
+    #                 score -= 100 / (ghost_dist + 1)
                     
-    # -----------------------------------------------------------------------
-    # Factor 7: Prevención de Sandwich y Culs-de-sac (Callejones)
-    # -----------------------------------------------------------------------                
-    valid_moves = [a for a in legal_actions if a != 'Stop']
-    dangerous_ghosts = [g for g in ghost_states if g.scaredTimer == 0]
 
-    if dangerous_ghosts:
-        # Obtenemos las distancias a todos los fantasmas peligrosos ordenadas de menor a mayor
-        d_ghosts = sorted([manhattanDistance(pacman_pos, g.getPosition()) for g in dangerous_ghosts])
-        
-        # CASO A: Callejón sin salida (Solo 1 vía de escape)
-        if len(valid_moves) == 1:
-            # Si el fantasma más cercano está a 5 pasos o menos, nos va a taponar la única salida.
-            if d_ghosts[0] <= 5:
-                score -= 3500  # Penalización masiva (suicidio inminente)
-                
-        # CASO B: Situación de Sándwich en Pasillo/Túnel (Solo 2 vías de escape)
-        elif len(valid_moves) == 2:
-            # Necesitamos al menos 2 fantasmas para que exista un sándwich
-            if len(d_ghosts) >= 2:
-                # Si los DOS fantasmas más cercanos están a corta distancia (ej. <= 6 pasos)
-                # asumimos un alto riesgo de que vengan por lados opuestos del pasillo.
-                if d_ghosts[0] <= 9 and d_ghosts[1] <= 9:
-                    score -= 4000  # Penalización crítica para forzar al agente a no entrar ahí
     return score
 
 
@@ -823,7 +771,7 @@ class NeuralAgentDummy(Agent):
         # Multiplicamos por 100 para estar en la misma escala que la heurística.
 
         #norm_nn = max(action_probs) * 100.0
-        norm_nn = max(action_probs) *100
+        norm_nn = max(action_probs) 
         return norm_nn
 
 
@@ -1311,12 +1259,12 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             if (gameState.isWin() or
                 gameState.isLose() or
                 depth == self.depth):
-                self.evaluation_combined(gameState)
-                # heuristic = traditional_evaluation(gameState)
-                # nnScore = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(gameState)
-                # print(heuristic)
-                # print(nnScore)
-                # return (1*heuristic + 0*nnScore)
+                #return self.evaluationFunction(gameState)
+                heuristic = self.evaluationFunction(gameState)
+                nnScore = AlphaBetaNeuralAgent.neural_agent_dummy.neural_evaluation(gameState)
+                print(heuristic)
+                print(nnScore)
+                return (0.7*heuristic + 0.3*nnScore)
 
             #Max (Pacman)
             if agentIndex == 0:
@@ -1331,7 +1279,7 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             legalActions = gameState.getLegalActions(agentIndex)
 
             if not legalActions:
-                return self.evaluation_combined(gameState)
+                return self.evaluationFunction(gameState)
 
             for action in legalActions:
                 successor = gameState.generateSuccessor(agentIndex,action)
