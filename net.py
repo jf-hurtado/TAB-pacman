@@ -21,7 +21,7 @@ HIDDEN_SIZE = 128
 NUM_ACTIONS = 5  # Stop, North, South, East, West
 BATCH_SIZE = 64
 LEARNING_RATE = 0.001
-NUM_EPOCHS = 100
+NUM_EPOCHS = 200
 MODELS_DIR = "models"
 
 # Mapeo de acciones a índices
@@ -110,7 +110,7 @@ class PacmanNet(nn.Module):
 #     print(f"Datos cargados: {len(all_maps)} ejemplos")
 #     return all_maps, all_actions
 
-def load_and_merge_data(data_dir="pacman_data", top_ratio=1):
+def load_and_merge_data(data_dir="pacman_data", top_ratio=0.9):
     """
     Carga los archivos CSV de partidas y los combina en un único DataFrame.
     Permite filtrar las mejores partidas basándose en el parámetro top_ratio (0.0 a 1.0).

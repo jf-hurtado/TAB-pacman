@@ -804,7 +804,7 @@ class NeuralAgentDummy(Agent):
         # Multiplicamos por 100 para estar en la misma escala que la heurística.
 
         #norm_nn = max(action_probs) * 100.0
-        norm_nn = max(action_probs) *100
+        norm_nn = max(action_probs)
         return norm_nn
 
 
@@ -1250,11 +1250,11 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
     
     def __init__(self,
                  evalFn='scoreEvaluationFunction',
-                 depth='4',
-                 start_heuristicsWeight=0.8,  # Peso de AlphaBeta al INICIO
-                 start_nnWeight=0.2,          # Peso de la Red Neuronal al INICIO
-                 end_heuristicsWeight=0.2,    # Peso de AlphaBeta al FINAL
-                 end_nnWeight=0.8):           # Peso de la Red Neuronal al FINAL):
+                 depth='3',
+                 start_heuristicsWeight=0.3,  # Peso de AlphaBeta al INICIO
+                 start_nnWeight=0.7,          # Peso de la Red Neuronal al INICIO
+                 end_heuristicsWeight=0.7,    # Peso de AlphaBeta al FINAL
+                 end_nnWeight=0.3):           # Peso de la Red Neuronal al FINAL):
         super().__init__(evalFn, depth)
 
         self.evaluationFunction = self.evaluation_combined
@@ -1277,11 +1277,11 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
     def evaluation_combined(self, state):
         # 1) Traditional score (with the new heuristics from Task 1)
         trad_score = traditional_evaluation(state)
-        print(f"Heuristic score: {trad_score}")
+        #print(f"Heuristic score: {trad_score}")
 
         # 2) Neural network score
         neural_score = self.neural_agent_dummy.neural_evaluation(state)
-        print(f"Neural network score: {neural_score}")
+        #print(f"Neural network score: {neural_score}")
 
         # 3) Weighted combination
         return self.w_heuristic * trad_score + self.w_neural * neural_score
@@ -1307,7 +1307,7 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
         self.w_heuristic = self.start_w_heuristic * (1 - progress) + self.end_w_heuristic * progress
         self.w_neural = self.start_w_neural * (1 - progress) + self.end_w_neural * progress
 
-        
+
         def alphabeta(agentIndex, depth, gameState, alpha, beta):
 
             if (gameState.isWin() or
