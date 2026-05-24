@@ -19,4 +19,5 @@ python pacman.py -p RandomAgent # to play with random agent
 python pacman.py -p NeuralAgent # to play with neural agent
 python net.py # to train the neural agent
 python pacman.py --frameTime 0.3 # to play in a slow mode 
+python3 pacman.py -l customMaze.lay --csv pacman_data/game_98.csv --frameTime 0.2 # to replay a game quickly
 ```
