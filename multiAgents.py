@@ -1251,14 +1251,28 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
     def __init__(self,
                  evalFn='scoreEvaluationFunction',
                  depth='4',
-                 heuristicsWeight=0.7,
-                 nnWeight=0.3):
+                 start_heuristicsWeight=0.8,  # Peso de AlphaBeta al INICIO
+                 start_nnWeight=0.2,          # Peso de la Red Neuronal al INICIO
+                 end_heuristicsWeight=0.2,    # Peso de AlphaBeta al FINAL
+                 end_nnWeight=0.8):           # Peso de la Red Neuronal al FINAL):
         super().__init__(evalFn, depth)
 
         self.evaluationFunction = self.evaluation_combined
-        self.w_heuristic = heuristicsWeight
-        self.w_neural = nnWeight
+        
+        # Guardamos los límites de la transición
+        self.start_w_heuristic = start_heuristicsWeight
+        self.start_w_neural = start_nnWeight
+        self.end_w_heuristic = end_heuristicsWeight
+        self.end_w_neural = end_nnWeight
+        
+        # Pesos actuales que usará evaluation_combined
+        self.w_heuristic = self.start_w_heuristic
+        self.w_neural = self.start_w_neural
+        
         self.neural_agent_dummy = NeuralAgentDummy()
+        
+        # Guardaremos la cantidad inicial de comida para calcular el progreso
+        self.initial_food = None
     
     def evaluation_combined(self, state):
         # 1) Traditional score (with the new heuristics from Task 1)
@@ -1278,6 +1292,22 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
+        # 1. Registrar la comida inicial en el primer turno
+        if self.initial_food is None:
+            self.initial_food = gameState.getNumFood()
+            # Si el mapa empieza sin comida (raro, pero previene división por cero)
+            if self.initial_food == 0:
+                self.initial_food = 1 
+
+        # 2. Calcular el progreso del juego (de 0.0 al inicio, a 1.0 al final)
+        current_food = gameState.getNumFood()
+        progress = 1.0 - (current_food / self.initial_food)
+
+        # 3. Interpolación lineal de los pesos
+        self.w_heuristic = self.start_w_heuristic * (1 - progress) + self.end_w_heuristic * progress
+        self.w_neural = self.start_w_neural * (1 - progress) + self.end_w_neural * progress
+
+        
         def alphabeta(agentIndex, depth, gameState, alpha, beta):
 
             if (gameState.isWin() or
