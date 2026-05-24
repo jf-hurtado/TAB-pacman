@@ -807,6 +807,41 @@ class NeuralAgentDummy(Agent):
         norm_nn = max(action_probs)
         return norm_nn
 
+    def batch_neural_evaluation(self, states_list):
+        """
+        Evalúa múltiples estados en un SOLO forward pass batch en GPU.
+        
+        Args:
+            states_list: Lista de GameState a evaluar
+        
+        Returns:
+            Lista de scores (float) de la red neuronal, uno por estado
+        """
+        if not states_list or self.model is None:
+            return [0.0] * len(states_list) if states_list else []
+
+        # Convertir todos los estados a matrices numpy
+        matrices = [self.state_to_matrix(s) for s in states_list]
+
+        # Stack en un solo batch tensor: shape (batch, height, width)
+        batch_array = np.array(matrices, dtype=np.float32)
+        batch_tensor = torch.FloatTensor(batch_array).to(self.device)
+
+        # Único forward pass para TODOS los estados
+        with torch.no_grad():
+            outputs = self.model(batch_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+
+        # Extraer el score de cada estado del batch
+        scores = []
+        for i, state in enumerate(states_list):
+            probs = probabilities[i].cpu().numpy()
+            legal_actions = state.getLegalActions()
+            action_probs = [probs[self.action_to_idx[a]] for a in legal_actions]
+            scores.append(max(action_probs) if action_probs else 0.0)
+
+        return scores
+
 
     def getAction(self, state):
         """
@@ -1364,6 +1399,26 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
             if nextAgent == gameState.getNumAgents():
                 nextAgent = 0
                 nextDepth = depth + 1
+
+            # BATCHING OPTIMIZATION:
+            # Si la SIGUIENTE llamada a alphabeta va a ser una hoja del árbol
+            # (profundidad máxima alcanzada), en lugar de evaluar cada estado
+            # uno por uno en GPU, recolectamos TODOS los sucesores y los
+            # evaluamos en un SOLO forward pass batch en GPU.
+            if nextAgent == 0 and nextDepth == self.depth:
+                successors = [gameState.generateSuccessor(agentIndex, a) for a in legalActions]
+                # Heurística individual (rápido, CPU)
+                heuristic_scores = [traditional_evaluation(s) for s in successors]
+                # Red neuronal en UN solo batch GPU
+                neural_scores = self.neural_agent_dummy.batch_neural_evaluation(successors)
+                # Combinar y aplicar alpha-beta pruning
+                for i in range(len(successors)):
+                    score = self.w_heuristic * heuristic_scores[i] + self.w_neural * neural_scores[i]
+                    v = min(v, score)
+                    if v <= alpha:
+                        return v
+                    beta = min(beta, v)
+                return v
 
             for action in legalActions:
 
