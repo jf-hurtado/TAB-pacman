@@ -203,7 +203,7 @@ def traditional_evaluation(state):
     # Factor 1: Distancia a la comida más cercana
     if food:
         min_food_distance = min(manhattanDistance(pacman_pos, food_pos) for food_pos in food)
-        score += 1.0 / (min_food_distance + 1)
+        score += 3.0 / (min_food_distance + 1)
 
     # Factor 2: Proximidad a fantasmas
     for ghost_state in ghost_states:
@@ -212,17 +212,22 @@ def traditional_evaluation(state):
 
         if ghost_state.scaredTimer > 0:
             # Si el fantasma está asustado, acercarse a él
-            score += 50 / (ghost_distance + 1)
+            score += 100 / (ghost_distance + 1)
         else:
-            # Si no está asustado, evitarlo
-            if ghost_distance <= 2:
-                score -= 200  # Gran penalización por estar demasiado cerca
+            # Si no está asustado, evitarlo (penalización graduada)
+            if ghost_distance <= 1:
+                score -= 300
+            elif ghost_distance == 2:
+                score -= 150
+            elif ghost_distance == 3:
+                score -= 50
+            
     # Factor 3: Cápsulas (defensivo y ofensivo)
     if capsules:
         min_cap_dist = min(manhattanDistance(pacman_pos, c) for c in capsules)
         # ¿Hay fantasmas peligrosos cerca?
         danger_close = any(
-            g.scaredTimer == 0 and manhattanDistance(pacman_pos, g.getPosition()) <= 4
+            g.scaredTimer == 0 and manhattanDistance(pacman_pos, g.getPosition()) <= 3
             for g in ghost_states
         )
         if danger_close:
@@ -234,21 +239,35 @@ def traditional_evaluation(state):
     nearby_food = sum(1 for f in food if manhattanDistance(pacman_pos, f) <= 4)
     score += nearby_food * 2.0
 
-    # Factor 5: Radar preventivo de fantasmas (evitar a distancia 2-5)
+    # Factor 5: Radar preventivo de fantasmas (evitar a distancia 4-5)
     for g in ghost_states:
         if g.scaredTimer == 0:
             dist = manhattanDistance(pacman_pos, g.getPosition())
-            if 2 < dist <= 5:
-                score -= 20.0 / dist
+            if 3 < dist <= 5:
+                score -= 30.0 / dist
 
     # Factor 6: Anti‑caza suicida
     for g in ghost_states:
         if g.scaredTimer > 0:
             dist = manhattanDistance(pacman_pos, g.getPosition())
             if dist > g.scaredTimer:
-                score -= 50.0 / (dist + 1)
+                score -= 100.0 / (dist + 1)
 
-
+    # Factor 7: Bonus de movilidad con detección de acorralamiento
+    legal_actions = state.getLegalActions(0)
+    if len(legal_actions) <= 2:
+        # Verificar si hay fantasmas peligrosos en un radio de 4
+        ghost_nearby = False
+        for g in ghost_states:
+            if g.scaredTimer == 0:
+                dist = manhattanDistance(pacman_pos, g.getPosition())
+                if dist <= 4:
+                    ghost_nearby = True
+                    # Penalización escalada: dist=1 → -200, dist=4 → -50
+                    score -= 500.0 / (dist + 1)
+        if not ghost_nearby:
+            # Solo es un pasillo estrecho, sin amenaza inminente
+            score -= 40
 
 
     # # Factor 3: Cápsulas
