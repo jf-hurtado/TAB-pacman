@@ -1,0 +1,29 @@
+python pacman.py -l customMaze.lay -p AlphaBetaNeuralAgent -n 10 -a depth=4 
+Modelo cargado correctamente desde models/pacman_model.pth
+Tamaño de entrada: (20, 11)
+NeuralAgent inicializado, usando dispositivo: cuda
+Reply mode: False
+Pacman emerges victorious! Score: 1930
+Datos del juego 94 guardados en pacman_data/game_94.csv
+Pacman emerges victorious! Score: 1437
+Datos del juego 95 guardados en pacman_data/game_95.csv
+Pacman emerges victorious! Score: 2088
+Datos del juego 96 guardados en pacman_data/game_96.csv
+Pacman died! Score: 918
+Datos del juego 97 guardados en pacman_data/game_97.csv
+Pacman emerges victorious! Score: 1745
+Datos del juego 98 guardados en pacman_data/game_98.csv
+Pacman emerges victorious! Score: 1903
+Datos del juego 99 guardados en pacman_data/game_99.csv
+Pacman died! Score: 886
+Datos del juego 100 guardados en pacman_data/game_100.csv
+Pacman emerges victorious! Score: 1864
+Datos del juego 101 guardados en pacman_data/game_101.csv
+Pacman died! Score: 851
+Datos del juego 102 guardados en pacman_data/game_102.csv
+Pacman emerges victorious! Score: 2114
+Datos del juego 103 guardados en pacman_data/game_103.csv
+Average Score: 1573.6
+Scores:        1930.0, 1437.0, 2088.0, 918.0, 1745.0, 1903.0, 886.0, 1864.0, 851.0, 2114.0
+Win Rate:      7/10 (0.70)
+Record:        Win, Win, Win, Loss, Win, Win, Loss, Win, Loss, Win
