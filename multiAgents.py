@@ -804,7 +804,7 @@ class NeuralAgentDummy(Agent):
         # Multiplicamos por 100 para estar en la misma escala que la heurística.
 
         #norm_nn = max(action_probs) * 100.0
-        norm_nn = max(action_probs) 
+        norm_nn = max(action_probs) *100
         return norm_nn
 
 
@@ -1250,9 +1250,9 @@ class AlphaBetaNeuralAgent(AlphaBetaAgent):
     
     def __init__(self,
                  evalFn='scoreEvaluationFunction',
-                 depth='2',
-                 heuristicsWeight=0.01,
-                 nnWeight=0.99):
+                 depth='4',
+                 heuristicsWeight=0.7,
+                 nnWeight=0.3):
         super().__init__(evalFn, depth)
 
         self.evaluationFunction = self.evaluation_combined
