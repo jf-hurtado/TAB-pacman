@@ -22,6 +22,7 @@ import random, util
 from game import Agent
 from pacman import GameState
 import math
+from functools import lru_cache
 
 class ReflexAgent(Agent):
     """
@@ -703,6 +704,10 @@ class NeuralAgentDummy(Agent):
         # Contador de movimientos
         self.move_count = 0
 
+        # Activar TensorFloat32 en GPU para ~1.3x más velocidad en matmuls
+        if self.device.type == 'cuda':
+            torch.set_float32_matmul_precision('high')
+
         print(f"NeuralAgent inicializado, usando dispositivo: {self.device}")
 
     def load_model(self, model_path):
@@ -721,6 +726,15 @@ class NeuralAgentDummy(Agent):
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.model.eval()  # Modo evaluación
 
+            # torch.compile: JIT compila el modelo para acelerar inferencia
+            # Usamos modo 'default' para evitar problemas con CUDA graphs en shapes dinámicos
+            if hasattr(torch, 'compile'):
+                try:
+                    self.model = torch.compile(self.model, mode="default")
+                    print("Modelo compilado con torch.compile")
+                except Exception as e:
+                    print(f"torch.compile no disponible: {e}")
+
             print(f"Modelo cargado correctamente desde {model_path}")
             print(f"Tamaño de entrada: {self.input_size}")
             return True
@@ -728,6 +742,7 @@ class NeuralAgentDummy(Agent):
             print(f"Error al cargar el modelo: {e}")
             return False
 
+    @lru_cache(maxsize=32768)
     def state_to_matrix(self, state):
         """Convierte el estado del juego en una matriz numérica normalizada"""
         # Obtener dimensiones del tablero
@@ -773,6 +788,7 @@ class NeuralAgentDummy(Agent):
 
         return numeric_map
 
+    @lru_cache(maxsize=262144)
     def neural_evaluation(self, state):
         """
         Una función de evaluación basada en la red neuronal y en heurísticas adicionales.
