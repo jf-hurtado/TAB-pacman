@@ -25,11 +25,11 @@ import io
 # CONFIGURACIÓN — Cambia estos valores a tu gusto
 # ======================================================================
 
-LAYOUT_NAME        = 'customMaze'      # Nombre del layout (sin .lay)
-AGENT_DEPTH        = 1                 # Profundidad del árbol de búsqueda
-START_SEED         = 100                 # Primera semilla a probar
-END_SEED           = 4               # Última semilla a probar (inclusive)
-OUTPUT_DIR         = 'pacman_data_seeds'  # Carpeta donde guardar los CSV
+LAYOUT_NAME        = 'mediumClassic'      # Nombre del layout (sin .lay)
+AGENT_DEPTH        = 4                 # Profundidad del árbol de búsqueda
+START_SEED         = 1                 # Primera semilla a probar
+END_SEED           = 100               # Última semilla a probar (inclusive)
+OUTPUT_DIR         = 'pacman_data_seeds_mediumClassic_depth4'  # Carpeta donde guardar los CSV
 TIMEOUT            = 300                # Segundos máximos por partida
 
 # Pesos para la combinación heurística + red neuronal
