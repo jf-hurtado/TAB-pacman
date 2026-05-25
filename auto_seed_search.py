@@ -26,10 +26,10 @@ import io
 # ======================================================================
 
 LAYOUT_NAME        = 'mediumClassic'      # Nombre del layout (sin .lay)
-AGENT_DEPTH        = 4                 # Profundidad del árbol de búsqueda
+AGENT_DEPTH        = 5                 # Profundidad del árbol de búsqueda
 START_SEED         = 1                 # Primera semilla a probar
 END_SEED           = 100               # Última semilla a probar (inclusive)
-OUTPUT_DIR         = 'pacman_data_seeds_mediumClassic_depth4'  # Carpeta donde guardar los CSV
+OUTPUT_DIR         = 'pacman_data_seeds_mediumClassic_depth5'  # Carpeta donde guardar los CSV
 TIMEOUT            = 300                # Segundos máximos por partida
 
 # Pesos para la combinación heurística + red neuronal
